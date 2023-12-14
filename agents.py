@@ -111,6 +111,7 @@ class LCRobot(Robot):
         # self.state = state
         # self.capacity = capacity
         self.payload = []
+        self.action = None
 
     @property
     def isFull(self):
@@ -124,55 +125,83 @@ class LCRobot(Robot):
     def wait(self):
         return super().wait()
 
-    def deliberate(self):
-        if self.state == EVADING:
-            return "evade_obstacle"
-        elif self.state == START:
-            self.state = MOVING_TO_AREA
-            return "move_to_area"
-        elif self.isFull and self.pos != BIN_LOC:
-            return "move_to_bin"
-        elif self.isFull and self.pos == BIN_LOC:
-            return "emptying"
+    # def deliberate(self):
+    #     if self.state == EVADING:
+    #         return "evade_obstacle"
+    #     elif self.state == START:
+    #         self.state = MOVING_TO_AREA
+    #         return "move_to_area"
+    #     elif self.isFull and self.pos != BIN_LOC:
+    #         return "move_to_bin"
+    #     elif self.isFull and self.pos == BIN_LOC:
+    #         return "emptying"
 
-        elif self.state == MOVING_TO_AREA:
-            return "move_to_area"
-        elif self.state == BUSY:
-            return "move_through_area"
-        elif self.state == PICKING:
-            return "pick"
+    #     elif self.state == MOVING_TO_AREA:
+    #         return "move_to_area"
+    #     elif self.state == BUSY:
+    #         return "move_through_area"
+    #     elif self.state == PICKING:
+    #         return "pick"
 
-        elif self.state == FINISHED:
-            return "finished"
+    #     elif self.state == FINISHED:
+    #         return "finished"
 
     def step(self):
-        action = self.deliberate()
-        if action == "move_to_area":
-            self.move_to_cleaning_area()
+        action = self.action
+        if action == "move_up":
+            self.move_up()
             self.move_payload()
             self.advance()
-        elif action == "move_through_area":
-            self.move_through_area()
+        elif action == "move_down":
+            self.move_down()
+            self.move_payload()
+            self.advance()
+        elif action == "move_left":
+            self.move_left()
+            self.move_payload()
+            self.advance()
+        elif action == "move_right":
+            self.move_right()
             self.move_payload()
             self.advance()
         elif action == "pick":
             self.pick_rubbish()
-        elif action == "move_to_bin":
-            self.move_to_bin()
             self.move_payload()
             self.advance()
-        elif action == "emptying":
-            self.drop_off()
-        elif action == "finished":
-            self.wait()
-        elif action == "evade_obstacle":
-            self.wait()
 
     def move_payload(self):
         payload_agents = self.get_payload_agent()
         for agent in payload_agents:
             agent.model.grid.move_agent(agent, (self.next_x, self.next_y))
             agent.pos = self.next_x, self.next_y
+
+    def move_up(self):
+        # Move agent up
+        if self.y < 49:
+            self.next_y += 1
+            self.next_x = self.x
+            self.model.move_agent((self.next_x, self.next_y))
+
+    def move_down(self):
+        # Move agent down
+        if self.y > 0:
+            self.next_y -= 1
+            self.next_x = self.x
+            self.model.move_agent((self.next_x, self.next_y))
+
+    def move_left(self):
+        # Move agent left
+        if self.x > 0:
+            self.next_x -= 1
+            self.next_y = self.y
+            self.model.move_agent((self.next_x, self.next_y))
+
+    def move_right(self):
+        # Move agent right
+        if self.x < 49:
+            self.next_x += 1
+            self.next_y = self.y
+            self.model.move_agent((self.next_x, self.next_y))
 
     # def move_to_bin(self):
     #     target = BIN_LOC
@@ -259,3 +288,6 @@ class LCRobot(Robot):
         self.payload = []
         # self.capacity = LC_CAPACITY
         print("Rubbish droppped off")
+
+    def set_action(self, action):
+        self.action = action
