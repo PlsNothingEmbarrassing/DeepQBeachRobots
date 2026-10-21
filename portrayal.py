@@ -2,6 +2,11 @@ from .agents import LCRobot, SmallRubbish, Obstacle
 def beach_portrayal(agent):
     if isinstance(agent, LCRobot):
         return lc_robot_portrayal(agent)
+    if isinstance(agent, SmallRubbish):
+        return s_rubbish_portrayal(agent)
+    if isinstance(agent, Obstacle):
+        return obstacle_portrayal(agent)
+    return {}
     
 
 def lc_robot_portrayal(lc_robot):

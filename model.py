@@ -1,6 +1,5 @@
-from .agents import LCRobot, SmallRubbish, Obstacle
+from .agents import LC_CAPACITY, LCRobot, SmallRubbish, Obstacle
 import mesa
-import random
 import itertools
 import math
 
@@ -12,10 +11,14 @@ class Beach(mesa.Model):
         n_small_rubbish,        
         width,
         height,
+        seed=None,
+        robot_capacity=None,
     ):
+        super().__init__(seed=seed)
         self.n_lc_robots = n_lc_robots        
         self.n_obstacles = n_obstacles
         self.n_small_rubbish = n_small_rubbish                
+        self.robot_capacity = LC_CAPACITY if robot_capacity is None else robot_capacity
         self.schedule = mesa.time.SimultaneousActivation(self)
         self.grid = mesa.space.MultiGrid(width, height, False)
         self.place_agents()
@@ -37,7 +40,13 @@ class Beach(mesa.Model):
             if lc_r_positions:          
                 u_id = next(counter)
                 x, y = lc_r_positions.pop()
-                agent = LCRobot(u_id, (x, y), self, target_area=search_spaces[i])
+                agent = LCRobot(
+                    u_id,
+                    (x, y),
+                    self,
+                    target_area=search_spaces[i],
+                    capacity=self.robot_capacity,
+                )
                 self.grid.place_agent(agent, (x, y))
                 self.schedule.add(agent)
                 #print("Placed LC at postion: " + str((x,y)))
@@ -46,7 +55,7 @@ class Beach(mesa.Model):
 
         
         # Using shuffle so agent placement should be different each time
-        random.shuffle(available_spaces)        
+        self.random.shuffle(available_spaces)
 
         # Creating and placing obstacles
         for i in range(self.n_obstacles):
@@ -59,9 +68,7 @@ class Beach(mesa.Model):
                 #print("Placed obstacle at position: " + str((x,y)))
             else:
                 print("No available spaces to place agents")
-        
-
-            # Creating and placing large rubbish
+        # Creating and placing small rubbish
         for i in range(self.n_small_rubbish):
             if available_spaces:
                 u_id = next(counter)

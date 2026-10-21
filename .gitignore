@@ -1,0 +1,6 @@
+training_runs/stage_1/best_checkpoint_step_10000/agent.index
+training_runs/stage_1/best_checkpoint_step_10000/agent.data-00000-of-00001
+*.pyc
+*.index
+*.pb
+policies/beach_dqn/variables/*

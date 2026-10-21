@@ -10,9 +10,8 @@ BUSY = 2
 PICKING = 3
 FULL = 4
 EMPTYING = 5
-PICKING = 6
-EVADING = 7
-FINISHED = 8
+EVADING = 6
+FINISHED = 7
 
 SEARCHING = 9
 CHARGING = 10
@@ -102,14 +101,20 @@ class LCRobot(Robot):
         id,
         pos,
         model,
+        target_area=None,
+        capacity=LC_CAPACITY,
     ):
-        super().__init__(id, model, pos)
+        super().__init__(
+            id,
+            model,
+            pos,
+            capacity=capacity,
+        )
         self.id = id
         self.x, self.y = pos
         self.model = model
         self.next_x, self.next_y = self.x, self.y
-        # self.state = state
-        # self.capacity = capacity
+        self.target_area = target_area
         self.payload = []
         self.action = None
 
@@ -118,7 +123,9 @@ class LCRobot(Robot):
         return super().isFull
 
     def advance(self):
-        self.model.grid.move_agent(self, (self.next_x, self.next_y))
+        target = (self.next_x, self.next_y)
+        if target != self.pos:
+            self.model.grid.move_agent(self, target)
         self.x = self.next_x
         self.y = self.next_y
 
@@ -172,36 +179,31 @@ class LCRobot(Robot):
     def move_payload(self):
         payload_agents = self.get_payload_agent()
         for agent in payload_agents:
-            agent.model.grid.move_agent(agent, (self.next_x, self.next_y))
-            agent.pos = self.next_x, self.next_y
+            agent.model.grid.move_agent(agent, self.pos)
+            agent.x, agent.y = self.pos
+
+    def _set_move(self, dx, dy):
+        target = (self.x + dx, self.y + dy)
+        if self.check_cell(target) in ("Obstacle", "Robot"):
+            self.wait()
+            return False
+        if not self.model.grid.out_of_bounds(target):
+            self.next_x, self.next_y = target
+            return True
+        self.wait()
+        return False
 
     def move_up(self):
-        # Move agent up
-        if self.y < 49:
-            self.next_y += 1
-            self.next_x = self.x
-            self.model.move_agent((self.next_x, self.next_y))
+        return self._set_move(0, 1)
 
     def move_down(self):
-        # Move agent down
-        if self.y > 0:
-            self.next_y -= 1
-            self.next_x = self.x
-            self.model.move_agent((self.next_x, self.next_y))
+        return self._set_move(0, -1)
 
     def move_left(self):
-        # Move agent left
-        if self.x > 0:
-            self.next_x -= 1
-            self.next_y = self.y
-            self.model.move_agent((self.next_x, self.next_y))
+        return self._set_move(-1, 0)
 
     def move_right(self):
-        # Move agent right
-        if self.x < 49:
-            self.next_x += 1
-            self.next_y = self.y
-            self.model.move_agent((self.next_x, self.next_y))
+        return self._set_move(1, 0)
 
     # def move_to_bin(self):
     #     target = BIN_LOC
@@ -223,24 +225,25 @@ class LCRobot(Robot):
             self.pos, moore=False, include_center=True, radius=0
         )
 
-        if litters != None:
+        picked_any = False
+        if litters is not None:
             for litter in litters:
                 # Check if agent is an Small rubbish instance and has not been picked
                 if isinstance(litter, SmallRubbish) and litter.state == UNPICKED:
                     # print("litter picked up")
+                    if self.capacity is not None and self.capacity < litter.weight:
+                        continue
                     self.payload.append(litter.id)
                     litter.state = PICKED
-
-                    self.modify_capacity(litter.weight)
+                    picked_any = True
+                    if self.capacity is not None:
+                        self.capacity -= litter.weight
                     self.state = BUSY
                     if self.isFull:
-                        # print("emptying")
                         self.x, self.start_y = self.pos
-                        # Decrement start_y so that no rows are missed
                         self.start_y -= 1
 
-        else:
-            pass
+        return picked_any
 
     def check_for_rubbish(self):
         litters = self.model.grid.get_neighbors(
@@ -260,9 +263,8 @@ class LCRobot(Robot):
     #     self.capacity -= weight
 
     def check_cell(self, pos):
-        x, y = pos
-        if (x > 49) or (y > 49):
-            return
+        if self.model.grid.out_of_bounds(pos):
+            return "Boundary"
         neighbors = self.model.grid.get_neighbors(
             pos, moore=False, include_center=True, radius=0
         )
@@ -280,14 +282,11 @@ class LCRobot(Robot):
         return super().get_payload_agent()
 
     def drop_off(self):
-        print("Emptying")
-        self.direction *= -1
         payload_items = self.get_payload_agent()
         for item in payload_items:
             item.state = DEALT_WITH
         self.payload = []
-        # self.capacity = LC_CAPACITY
-        print("Rubbish droppped off")
+        self.capacity = LC_CAPACITY
 
     def set_action(self, action):
         self.action = action
