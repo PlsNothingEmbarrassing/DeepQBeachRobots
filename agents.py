@@ -29,7 +29,7 @@ CHARGING_STATION = (0, 0)
 
 class SmallRubbish(mesa.Agent):
     def __init__(self, id, pos, model, state=UNPICKED, weight=1):
-        super().__init__(id, model)
+        super().__init__(model)
         self.x, self.y = pos
         self.state = state
         self.id = id
@@ -42,7 +42,7 @@ class SmallRubbish(mesa.Agent):
 
 class Obstacle(mesa.Agent):
     def __init__(self, id, model, pos):
-        super().__init__(id, model)
+        super().__init__(model)
         self.x, self.y = pos
         self.id = id
         self.model = model
@@ -53,7 +53,7 @@ class Obstacle(mesa.Agent):
 
 class Robot(mesa.Agent):
     def __init__(self, unique_id, model, pos, state=START, capacity=None, speed=None):
-        super().__init__(unique_id, model)
+        super().__init__(model)
         self.id = unique_id
         self.model = model
         self.x, self.y = pos
@@ -85,7 +85,7 @@ class Robot(mesa.Agent):
         self.y = self.next_y
 
     def get_payload_agent(self):
-        all_agents = self.model.schedule.agents
+        all_agents = self.model.agents
         payload_agents = []
         for agent in all_agents:
             if agent.id not in self.payload:

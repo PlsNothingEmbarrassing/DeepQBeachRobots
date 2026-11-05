@@ -1,7 +1,8 @@
-from .agents import LC_CAPACITY, LCRobot, SmallRubbish, Obstacle
 import mesa
 import itertools
 import math
+
+from .agents import LC_CAPACITY, LCRobot, SmallRubbish, Obstacle
 
 class Beach(mesa.Model):
     def __init__(
@@ -13,13 +14,39 @@ class Beach(mesa.Model):
         height,
         seed=None,
         robot_capacity=None,
+        randomize_robot_start=False,
     ):
-        super().__init__(seed=seed)
+        counts = {
+            "n_lc_robots": n_lc_robots,
+            "n_obstacles": n_obstacles,
+            "n_small_rubbish": n_small_rubbish,
+        }
+        integers = {**counts, "width": width, "height": height}
+        if any(
+            not isinstance(value, int) or isinstance(value, bool)
+            for value in integers.values()
+        ):
+            raise ValueError("grid dimensions and agent counts must be integers")
+        if width <= 0 or height <= 0:
+            raise ValueError("width and height must be positive")
+        if any(value < 0 for value in counts.values()):
+            raise ValueError("agent counts must be non-negative")
+        if n_lc_robots == 0:
+            raise ValueError("at least one robot is required")
+        if sum(counts.values()) > width * height:
+            raise ValueError("the grid does not have enough cells for all agents")
+        if robot_capacity is not None and (
+            not isinstance(robot_capacity, int) or robot_capacity < 0
+        ):
+            raise ValueError("robot_capacity must be a non-negative integer")
+        if not isinstance(randomize_robot_start, bool):
+            raise ValueError("randomize_robot_start must be a boolean")
+        super().__init__(rng=seed)
         self.n_lc_robots = n_lc_robots        
         self.n_obstacles = n_obstacles
         self.n_small_rubbish = n_small_rubbish                
         self.robot_capacity = LC_CAPACITY if robot_capacity is None else robot_capacity
-        self.schedule = mesa.time.SimultaneousActivation(self)
+        self.randomize_robot_start = randomize_robot_start
         self.grid = mesa.space.MultiGrid(width, height, False)
         self.place_agents()
         self.running = True
@@ -32,24 +59,26 @@ class Beach(mesa.Model):
         # Use counter to increment ids based on num agents
         counter = itertools.count()
 
-        lc_r_positions = self.find_centre_positions()
-        available_spaces = list(filter(lambda x:x not in lc_r_positions, all_spaces))
+        lc_r_positions = (
+            self.random.sample(all_spaces, self.n_lc_robots)
+            if self.randomize_robot_start
+            else self.find_centre_positions()
+        )
+        robot_spaces = set(lc_r_positions)
+        available_spaces = [space for space in all_spaces if space not in robot_spaces]
         search_spaces = self.assign_cleaning_area()
         # Creating and placing LC robots
-        for i in range(self.n_lc_robots):  
-            if lc_r_positions:          
-                u_id = next(counter)
-                x, y = lc_r_positions.pop()
-                agent = LCRobot(
-                    u_id,
-                    (x, y),
-                    self,
-                    target_area=search_spaces[i],
-                    capacity=self.robot_capacity,
-                )
-                self.grid.place_agent(agent, (x, y))
-                self.schedule.add(agent)
-                #print("Placed LC at postion: " + str((x,y)))
+        for i in range(self.n_lc_robots):
+            u_id = next(counter)
+            x, y = lc_r_positions.pop()
+            agent = LCRobot(
+                u_id,
+                (x, y),
+                self,
+                target_area=search_spaces[i],
+                capacity=self.robot_capacity,
+            )
+            self.grid.place_agent(agent, (x, y))
             
         
 
@@ -58,27 +87,17 @@ class Beach(mesa.Model):
         self.random.shuffle(available_spaces)
 
         # Creating and placing obstacles
-        for i in range(self.n_obstacles):
-            if available_spaces:
-                u_id = next(counter)
-                x, y = available_spaces.pop()
-                agent = Obstacle(u_id, self, (x, y))
-                self.grid.place_agent(agent, (x, y))
-                self.schedule.add(agent)                
-                #print("Placed obstacle at position: " + str((x,y)))
-            else:
-                print("No available spaces to place agents")
+        for _ in range(self.n_obstacles):
+            u_id = next(counter)
+            x, y = available_spaces.pop()
+            agent = Obstacle(u_id, self, (x, y))
+            self.grid.place_agent(agent, (x, y))
         # Creating and placing small rubbish
-        for i in range(self.n_small_rubbish):
-            if available_spaces:
-                u_id = next(counter)
-                x, y = available_spaces.pop()
-                agent = SmallRubbish(u_id, (x, y), self)
-                self.grid.place_agent(agent, (x, y))
-                self.schedule.add(agent)
-                #print("Placed SR at position: " + str((x,y)))
-            else:
-                print("No available spaces to place agents")
+        for _ in range(self.n_small_rubbish):
+            u_id = next(counter)
+            x, y = available_spaces.pop()
+            agent = SmallRubbish(u_id, (x, y), self)
+            self.grid.place_agent(agent, (x, y))
                 
     def assign_cleaning_area(self):
         ca_width = math.ceil(self.grid.width / self.n_lc_robots)
@@ -110,4 +129,4 @@ class Beach(mesa.Model):
         return positions
         
     def step(self):
-        self.schedule.step()
+        self.agents.shuffle_do("step")
